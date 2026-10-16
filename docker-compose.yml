@@ -1,0 +1,128 @@
+# Chạy Ticket2h trên máy local, trong thư mục infra.
+#   docker compose up -d                  chỉ hạ tầng (Postgres, Kafka, Mailpit): service chạy từ IDE hoặc ./mvnw
+#   docker compose --profile apps up -d   hạ tầng + 4 service từ image trên GitHub Container Registry
+#                                         (không cần clone repo service nào, không cần cài Java)
+# Secret đọc từ infra/.env (tạo bằng scripts/init-env.sh). Mỗi service chỉ nhận những biến nó cần.
+# `name` cố định tên project, nên container luôn là ticket2h-postgres-1... dù thư mục được đặt tên gì.
+name: ticket2h
+
+x-app-image: &app
+  profiles: [apps]
+  pull_policy: missing     # có image trong máy (vừa build tay) thì dùng luôn, không có thì kéo về
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      # Tài khoản quản trị, chỉ dùng để xem/sửa tay (DBeaver). Service dùng user riêng (postgres/init).
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Chỉ chạy MỘT LẦN, lúc volume pgdata còn trống: tạo user và database riêng cho từng service
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:4.3.1
+    ports: ["9092:9092"]
+    environment:
+      # Một node KRaft (vừa broker vừa controller), hai cổng nghe:
+      #   localhost:9092  cho service chạy trên máy (IDE, ./mvnw)
+      #   kafka:19092     cho service chạy trong compose (profile apps)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: HOST://:9092,DOCKER://:19092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: HOST://localhost:9092,DOCKER://kafka:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: HOST:PLAINTEXT,DOCKER:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      # Chỉ có một node nên mọi topic nội bộ của Kafka chỉ có một bản sao
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.31
+    ports:
+      - "1025:1025"   # SMTP: notification-service gửi email vào đây
+      - "8025:8025"   # giao diện xem email: http://localhost:8025
+
+  # ---- Các service (profile apps). Cổng giống hệt lúc chạy bằng ./mvnw, nên scripts/demo.sh chạy được với cả hai cách.
+  # Địa chỉ trình duyệt mở (trang thanh toán, link trong email) vẫn là localhost; địa chỉ service gọi nhau là tên
+  # service trong compose. Tên biến môi trường: Spring đổi ticket2h.identity-api.base-url thành TICKET2H_IDENTITYAPI_BASEURL.
+
+  identity-service:
+    <<: *app
+    image: ${TICKET2H_REGISTRY:-ghcr.io/ticket2h}/identity-service:${TICKET2H_TAG:-latest}
+    ports: ["8082:8082"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      SPRING_PROFILES_ACTIVE: dev            # tạo tài khoản mẫu (admin, organizer1, staff1, buyer1..3)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/identity
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      INTERNAL_API_KEY_CORE: ${INTERNAL_API_KEY_CORE}
+      INTERNAL_API_KEY_NOTIFICATION: ${INTERNAL_API_KEY_NOTIFICATION}
+
+  core-service:
+    <<: *app
+    image: ${TICKET2H_REGISTRY:-ghcr.io/ticket2h}/core-service:${TICKET2H_TAG:-latest}
+    ports: ["8080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    environment:
+      SPRING_PROFILES_ACTIVE: dev            # tạo sự kiện mẫu
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/core
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      TICKET2H_JWT_JWKSETURI: http://identity-service:8082/.well-known/jwks.json
+      TICKET2H_IDENTITYAPI_BASEURL: http://identity-service:8082
+      TICKET2H_PAYMENT_MOCKPAY_BASEURL: http://mock-payment-gateway:9090
+      # MockPay gửi webhook tới đây (từ container sang container); return-url vẫn là localhost vì trình duyệt mở nó
+      TICKET2H_PAYMENT_MOCKPAY_NOTIFYURL: http://core-service:8080/webhooks/payments/mockpay
+      MOCKPAY_API_KEY: ${MOCKPAY_API_KEY}
+      MOCKPAY_WEBHOOK_SECRET: ${MOCKPAY_WEBHOOK_SECRET}
+      QR_PRIVATE_KEY: ${QR_PRIVATE_KEY}
+      QR_PUBLIC_KEY: ${QR_PUBLIC_KEY}
+      INTERNAL_API_KEY_CORE: ${INTERNAL_API_KEY_CORE}
+      INTERNAL_API_KEY_NOTIFICATION: ${INTERNAL_API_KEY_NOTIFICATION}
+
+  notification-service:
+    <<: *app
+    image: ${TICKET2H_REGISTRY:-ghcr.io/ticket2h}/notification-service:${TICKET2H_TAG:-latest}
+    ports: ["8081:8081"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      SPRING_MAIL_HOST: mailpit
+      TICKET2H_COREAPI_BASEURL: http://core-service:8080
+      TICKET2H_IDENTITYAPI_BASEURL: http://identity-service:8082
+      INTERNAL_API_KEY_NOTIFICATION: ${INTERNAL_API_KEY_NOTIFICATION}
+
+  mock-payment-gateway:
+    <<: *app
+    image: ${TICKET2H_REGISTRY:-ghcr.io/ticket2h}/mock-payment-gateway:${TICKET2H_TAG:-latest}
+    ports: ["9090:9090"]
+    environment:
+      MOCKPAY_API_KEY: ${MOCKPAY_API_KEY}
+      MOCKPAY_WEBHOOK_SECRET: ${MOCKPAY_WEBHOOK_SECRET}
+
+volumes:
+  pgdata:

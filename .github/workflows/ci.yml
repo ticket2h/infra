@@ -1,0 +1,23 @@
+# Kiểm tra repo infra: docker-compose.yml hợp lệ, script shell không có lỗi thường gặp (shellcheck có sẵn trên runner).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: docker-compose.yml hợp lệ
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          docker compose --profile apps config --quiet
+      - name: shellcheck
+        run: shellcheck scripts/*.sh

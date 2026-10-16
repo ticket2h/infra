@@ -1,0 +1,9 @@
+# Secret: không commit
+.env
+*.pem
+
+# File sinh ra khi chạy demo
+ticket*.png
+
+.idea
+.vscode/
