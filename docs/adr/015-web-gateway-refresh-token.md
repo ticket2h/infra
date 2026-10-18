@@ -1,20 +1,20 @@
-# ADR-015: Web SPA, gateway nginx trong image web, refresh token cookie, OpenAPI cho mọi service
+# ADR-015: Web SPA, gateway nginx trong image web-app, refresh token cookie, OpenAPI cho mọi service
 
 - Trạng thái: Đã chấp nhận
 - Ngày: 2026-10-18
 - Liên quan: ADR-013 (JWT RS256, việc còn để ngỏ: token không thu hồi được), kiến trúc bước 3 (api-gateway)
 
 ## Bối cảnh
-Hệ thống chưa có giao diện: client là curl và `scripts/demo.sh`. Làm web (repo `ticket2h/web`) gặp ba việc:
+Hệ thống chưa có giao diện: client là curl và `scripts/demo.sh`. Làm web (repo `ticket2h/web-app`) gặp ba việc:
 
 1. Trình duyệt phải gọi hai cổng (identity 8082, core 8080), cả hai chưa bật CORS.
 2. Access token sống 1 giờ, không thu hồi được. Web giữ nó ở đâu: `localStorage` thì một lỗi XSS là mất token.
 3. Kiểu dữ liệu của API chỉ có trong `docs/api.md`, gõ tay sang TypeScript thì lệch dần.
 
 ## Quyết định
-- **Web là SPA React 19 + Vite**, thư viện giao diện `momi-ui` (cài từ git tag). Repo riêng `web`, cùng cách làm
-  như các service: CI riêng, image `ghcr.io/ticket2h/web`, có trong `docker-compose.yml` (profile `apps`, cổng 3000).
-- **Gateway cho trình duyệt là nginx nằm trong image web** (`web/nginx/default.conf.template`), không phải service
+- **Web là SPA React 19 + Vite**, thư viện giao diện `momi-ui` (cài từ git tag). Repo riêng `web-app`, cùng cách làm
+  như các service: CI riêng, image `ghcr.io/ticket2h/web-app`, có trong `docker-compose.yml` (profile `apps`, cổng 3000).
+- **Gateway cho trình duyệt là nginx nằm trong image web-app** (`web-app/nginx/default.conf.template`), không phải service
   Spring Cloud Gateway riêng: `/api/identity/**` → identity, `/api/core/**` → core, bỏ tiền tố. Chặn
   `/api/*/internal/**` và `/api/*/actuator/**` (404). Trình duyệt chỉ thấy một origin, nên không cần CORS.
   Khi dev, proxy của Vite làm y hệt.

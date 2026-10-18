@@ -3,7 +3,7 @@
 ## Hiện tại (sau bước 2, ngày 2026-10-16)
 
 ```
-                       Client (curl, demo.sh; web :3000 qua nginx, ADR-015)
+                       Client (curl, demo.sh; web-app :3000 qua nginx, ADR-015)
                  đăng ký, đăng nhập │                │ mọi API khác, kèm JWT
                                     ▼                ▼
                  identity-service :8082      core-service :8080 ◄──── webhook ký HMAC ────┐
@@ -83,7 +83,7 @@ service: [`contracts.md`](contracts.md).
 | 1 | **notification-service**: email ra khỏi core; API nội bộ có khoá riêng; database riêng | Xong (2026-10-16) |
 | 2 | **identity-service**: tài khoản ra khỏi core; JWT RS256 + JWKS; core bỏ khoá ngoại tới `users`/`organizers` | Xong (2026-10-16) |
 | 3 | **api-gateway** (Spring Cloud Gateway): client chỉ gọi một cổng; chặn `/internal/**` từ bên ngoài | Chưa làm, cần duyệt thêm dependency |
-| 3a | **web** (repo `web`, ADR-015): SPA React + momi-ui; nginx trong image web làm gateway tạm (`/api/identity`, `/api/core`, chặn `/internal`); refresh token cookie ở identity; OpenAPI ở identity và core | P0 xong (2026-10-18): đăng nhập, danh sách sự kiện |
+| 3a | **web-app** (repo `web-app`, ADR-015): SPA React + momi-ui; nginx trong image web-app làm gateway tạm (`/api/identity`, `/api/core`, chặn `/internal`); refresh token cookie ở identity; OpenAPI ở identity và core | P0 xong (2026-10-18): đăng nhập, danh sách sự kiện |
 
 Sau bước 3, các mốc M4–M6 của lộ trình (dữ liệu lớn, flash sale, vận hành) làm trên core-service.
 
