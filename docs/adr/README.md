@@ -10,3 +10,4 @@ thì viết ADR mới và đánh dấu ADR cũ là "Bị thay thế bởi ADR-NN
 | [012](012-nhieu-repo-database-rieng.md) | Mỗi service một repo, một database; đổi tên hệ thống thành Ticket2h |
 | [013](013-tach-identity-service.md) | Tách identity-service; core tin JWT RS256 qua JWKS, không giữ bản sao người dùng |
 | [014](014-repo-tu-dung-ci-image.md) | Mỗi repo tự đứng được: CI riêng, image trên GHCR, infra chạy cả hệ thống từ image |
+| [015](015-web-gateway-refresh-token.md) | Web SPA, gateway nginx trong image web, refresh token cookie, OpenAPI |

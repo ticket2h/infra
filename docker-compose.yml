@@ -1,6 +1,6 @@
 # Chạy Ticket2h trên máy local, trong thư mục infra.
 #   docker compose up -d                  chỉ hạ tầng (Postgres, Kafka, Mailpit): service chạy từ IDE hoặc ./mvnw
-#   docker compose --profile apps up -d   hạ tầng + 4 service từ image trên GitHub Container Registry
+#   docker compose --profile apps up -d   hạ tầng + 4 service + web từ image trên GitHub Container Registry
 #                                         (không cần clone repo service nào, không cần cài Java)
 # Secret đọc từ infra/.env (tạo bằng scripts/init-env.sh). Mỗi service chỉ nhận những biến nó cần.
 # `name` cố định tên project, nên container luôn là ticket2h-postgres-1... dù thư mục được đặt tên gì.
@@ -123,6 +123,19 @@ services:
     environment:
       MOCKPAY_API_KEY: ${MOCKPAY_API_KEY}
       MOCKPAY_WEBHOOK_SECRET: ${MOCKPAY_WEBHOOK_SECRET}
+
+  # Giao diện web + gateway (nginx): http://localhost:3000. /api/identity/** và /api/core/** chuyển tới hai service,
+  # /internal/** bị chặn (ADR-015). Chạy web bằng `npm run dev` (cổng 5173) thì không cần container này.
+  web:
+    <<: *app
+    image: ${TICKET2H_REGISTRY:-ghcr.io/ticket2h}/web:${TICKET2H_TAG:-latest}
+    ports: ["3000:80"]
+    depends_on:
+      - identity-service
+      - core-service
+    environment:
+      IDENTITY_UPSTREAM: http://identity-service:8082
+      CORE_UPSTREAM: http://core-service:8080
 
 volumes:
   pgdata:

@@ -3,7 +3,7 @@
 [![CI](https://github.com/ticket2h/infra/actions/workflows/ci.yml/badge.svg)](https://github.com/ticket2h/infra/actions/workflows/ci.yml)
 
 Ticket2h là hệ thống bán vé sự kiện, đang được tách dần thành microservice. Hệ thống tiếp nối dự án TicketRush
-(M1–M3) trong `lo-trinh-backend-java.md` và `ticketrush-m2-m3-huong-dan.md`. Repo này không chứa code service. Nó chứa:
+(M1–M3) trong `ticketrush-m2-m3-huong-dan.md`. Repo này không chứa code service. Nó chứa:
 
 - `docker-compose.yml`: PostgreSQL, Kafka, Mailpit dùng chung khi chạy local; profile `apps` chạy thêm 4 service từ image
 - `postgres/init/`: tạo user và database riêng cho từng service
