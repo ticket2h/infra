@@ -12,6 +12,7 @@ Ticket2h gồm **4 service + hạ tầng**, mỗi phần một repo trên GitHub
 | [`core-service`](https://github.com/ticket2h/core-service) | 8080 | Lõi: sự kiện, giữ ghế, đơn hàng, thanh toán, vé, check-in, chuyển nhượng |
 | [`notification-service`](https://github.com/ticket2h/notification-service) | 8081 | Nghe event vé trên Kafka, gửi email có QR |
 | [`mock-payment-gateway`](https://github.com/ticket2h/mock-payment-gateway) | 9090 | MockPay, cổng thanh toán giả lập |
+| [`web-app`](https://github.com/ticket2h/web-app) | 3000 | Giao diện web (React); khi dev chạy `npm run dev` ở 5173 |
 
 Có hai cách chạy, chọn theo việc bạn muốn làm:
 
@@ -118,7 +119,7 @@ Lệnh này sinh `infra/.env` với các giá trị ngẫu nhiên:
 | `JWT_PRIVATE_KEY` | identity | Khoá RSA ký token đăng nhập. Chỉ identity đọc; service khác lấy public key qua JWKS |
 | `QR_PRIVATE_KEY`, `QR_PUBLIC_KEY` | core | Cặp khoá Ed25519 ký QR vé |
 | `INTERNAL_API_KEY_NOTIFICATION` | notification, core, identity | notification-service gọi API nội bộ `/internal/**` của core và identity |
-| `INTERNAL_API_KEY_CORE` | core, identity | core-service gọi API nội bộ của identity (tra email) |
+| `INTERNAL_API_KEY_CORE` | core, identity | core-service gọi API nội bộ của identity (tra tài khoản theo email, theo id) |
 
 - Chạy bằng Docker (Cách A): `docker compose` đọc `infra/.env` và đưa cho mỗi container **chỉ những biến nó cần**.
 - Chạy bằng `./mvnw`/IDE (Cách B, C): service **tự đọc** `../infra/.env` khi khởi động, không cần đặt biến môi
@@ -171,13 +172,14 @@ profile `dev`: identity tạo tài khoản mẫu, core tạo sự kiện mẫu c
 
 ```bash
 cd ~/personal-projects/ticket2h/infra
-docker compose --profile apps up -d     # hạ tầng + 4 service từ ghcr.io/ticket2h/*:latest
-docker compose --profile apps ps        # 7 container
+docker compose --profile apps up -d     # hạ tầng + 4 service + web-app từ ghcr.io/ticket2h/*:latest
+docker compose --profile apps ps        # 8 container
 docker compose logs -f core-service     # xem log một service
 ```
 
 Profile `apps` bật thêm 4 container `identity-service`, `core-service`, `notification-service`,
-`mock-payment-gateway`, cùng cổng như khi chạy bằng `./mvnw`. Lần đầu tải 4 image mất vài phút. Muốn chạy bản mới
+`mock-payment-gateway`, cùng cổng như khi chạy bằng `./mvnw`, và `web-app` ở http://localhost:3000 (giao diện web; nginx
+trong đó chuyển `/api/identity`, `/api/core` tới hai service). Lần đầu tải 4 image mất vài phút. Muốn chạy bản mới
 nhất trên `main`: `docker compose --profile apps pull` rồi `up -d` lại. Tắt: `docker compose --profile apps stop`.
 
 **Sửa một service, các service khác chạy từ image:** tắt container của service đó rồi chạy nó bằng Cách B hoặc C:

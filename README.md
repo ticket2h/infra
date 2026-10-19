@@ -22,6 +22,7 @@ Mỗi service là một repo git riêng, có CI riêng (GitHub Actions: test, r�
 | [`core-service`](https://github.com/ticket2h/core-service) | 8080 | Sự kiện, giữ chỗ, đơn hàng, thanh toán, vé, check-in, chuyển nhượng |
 | [`notification-service`](https://github.com/ticket2h/notification-service) | 8081 | Nghe event vé trên Kafka, gửi email có QR |
 | [`mock-payment-gateway`](https://github.com/ticket2h/mock-payment-gateway) | 9090 | MockPay, cổng thanh toán giả lập |
+| [`web-app`](https://github.com/ticket2h/web-app) | 3000 | Web cho khách, ban tổ chức, soát vé, quản trị; nginx trong image làm gateway (ADR-015) |
 
 Chưa có api-gateway: đăng ký, đăng nhập gọi `:8082`, còn lại gọi `:8080`.
 
@@ -34,9 +35,13 @@ Máy mới chưa có gì? Làm theo [`docs/chay-tren-may-moi.md`](docs/chay-tren
 ```bash
 git clone https://github.com/ticket2h/infra.git && cd infra
 scripts/init-env.sh                       # tạo .env với secret ngẫu nhiên (không commit)
-docker compose --profile apps up -d       # hạ tầng + 4 service từ ghcr.io/ticket2h/*
+docker compose --profile apps up -d       # hạ tầng + 4 service + web-app từ ghcr.io/ticket2h/*
 scripts/demo.sh
 ```
+
+Mở http://localhost:3000: mua vé bằng tài khoản `buyer1@test.local`, quản lý sự kiện bằng `organizer1@test.local`, soát vé
+bằng `staff1@test.local`, quản trị bằng `admin@test.local` (mật khẩu `Passw0rd!`). Thanh toán ở trang MockPay
+(http://localhost:9090), email vé ở Mailpit (http://localhost:8025).
 
 **Sửa code một service**: clone repo đó cạnh `infra`, bật hạ tầng, chạy service bằng `./mvnw` (service tìm secret ở
 `../infra/.env`). Các service còn lại chạy từ image hoặc cũng bằng `./mvnw`:

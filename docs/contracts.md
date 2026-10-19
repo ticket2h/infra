@@ -70,7 +70,7 @@ những service được phép (`ticket2h.internal-api.clients.<tên-service>`).
 | Service gọi | Biến chứa khoá | Được gọi tới |
 |---|---|---|
 | notification-service | `INTERNAL_API_KEY_NOTIFICATION` | core-service (`/internal/tickets`), identity-service (`/internal/users/{id}`) |
-| core-service | `INTERNAL_API_KEY_CORE` | identity-service (`/internal/users/lookup`) |
+| core-service | `INTERNAL_API_KEY_CORE` | identity-service (`/internal/users/lookup`, `/internal/users/{id}`) |
 
 ## 3. API nội bộ của core-service
 
@@ -108,7 +108,10 @@ Hai API trả cùng một dạng, `Cache-Control: no-store`:
 
 ### `GET /internal/users/{userId}`
 
-Gọi bởi: notification-service (email và tên người nhận). Không có người dùng, hoặc id không phải UUID: `404`, `code = NOT_FOUND`.
+Gọi bởi: notification-service (email và tên người nhận), core-service (email và tên nhân viên soát vé trong
+`GET /organizer/events/{id}/staff`, mỗi người một lần gọi). Không có người dùng, hoặc id không phải UUID: `404`,
+`code = NOT_FOUND`. core coi `404` là tài khoản đã bị xoá (vẫn liệt kê id, `email` và `fullName` là `null`); mã lỗi
+khác hoặc không trả lời: core báo `502 IDENTITY_UNAVAILABLE`.
 
 ### `POST /internal/users/lookup` với body `{"email": "..."}`
 

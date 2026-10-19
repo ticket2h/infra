@@ -94,6 +94,8 @@ services:
       TICKET2H_PAYMENT_MOCKPAY_BASEURL: http://mock-payment-gateway:9090
       # MockPay gửi webhook tới đây (từ container sang container); return-url vẫn là localhost vì trình duyệt mở nó
       TICKET2H_PAYMENT_MOCKPAY_NOTIFYURL: http://core-service:8080/webhooks/payments/mockpay
+      # Sau trang MockPay, trình duyệt về trang /payments/return của container web-app (cổng 3000), core thêm ?orderId=
+      TICKET2H_PAYMENT_MOCKPAY_RETURNURL: http://localhost:3000/payments/return
       MOCKPAY_API_KEY: ${MOCKPAY_API_KEY}
       MOCKPAY_WEBHOOK_SECRET: ${MOCKPAY_WEBHOOK_SECRET}
       QR_PRIVATE_KEY: ${QR_PRIVATE_KEY}

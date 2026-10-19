@@ -11,7 +11,7 @@
                  phát JWT (RS256)            payment, ticketing, outbox  ── X-Api-Key ──► mock-payment-gateway :9090
                    │  ▲   ▲   ▲                │      │                                   (không có database)
           database │  │   │   └── JWKS ────────┤      │ outbox → Kafka
-          "identity"   │   └── POST /internal/users/lookup (tra email)
+          "identity"   │   └── POST /internal/users/lookup, GET /internal/users/{id} (tra tài khoản)
                    ▼  │                        ▼      ▼
               PostgreSQL     database "core"  PostgreSQL   ticket2h.ticket-events
                       │                                       │
@@ -25,7 +25,7 @@
 | Service | Làm gì | Dữ liệu riêng | Nói chuyện với ai |
 |---|---|---|---|
 | identity-service | Đăng ký, đăng nhập, phát JWT, quản trị tài khoản và ban tổ chức | database `identity` (`users`, `organizers`) | Công bố JWKS; cho core và notification gọi `/internal/users/**` |
-| core-service | Sự kiện, giữ ghế, đơn, thanh toán, phát vé, check-in, chuyển nhượng | database `core` | Kiểm tra JWT bằng JWKS; tra email ở identity; gọi MockPay; nhận webhook; gửi event lên Kafka; cho notification gọi `/internal/tickets` |
+| core-service | Sự kiện, giữ ghế, đơn, thanh toán, phát vé, check-in, chuyển nhượng | database `core` | Kiểm tra JWT bằng JWKS; tra tài khoản ở identity (theo email, theo id); gọi MockPay; nhận webhook; gửi event lên Kafka; cho notification gọi `/internal/tickets` |
 | notification-service | Gửi email vé và email chuyển nhượng | database `notification` (sổ chống gửi trùng) | Nghe `ticket2h.ticket-events`; lấy email từ identity, vé từ core; gửi SMTP |
 | mock-payment-gateway | Giả lập cổng thanh toán, có chế độ "chaos" | không (lưu trong bộ nhớ) | Nhận lệnh từ core; gửi webhook về core |
 
@@ -83,7 +83,7 @@ service: [`contracts.md`](contracts.md).
 | 1 | **notification-service**: email ra khỏi core; API nội bộ có khoá riêng; database riêng | Xong (2026-10-16) |
 | 2 | **identity-service**: tài khoản ra khỏi core; JWT RS256 + JWKS; core bỏ khoá ngoại tới `users`/`organizers` | Xong (2026-10-16) |
 | 3 | **api-gateway** (Spring Cloud Gateway): client chỉ gọi một cổng; chặn `/internal/**` từ bên ngoài | Chưa làm, cần duyệt thêm dependency |
-| 3a | **web-app** (repo `web-app`, ADR-015): SPA React + momi-ui; nginx trong image web-app làm gateway tạm (`/api/identity`, `/api/core`, chặn `/internal`); refresh token cookie ở identity; OpenAPI ở identity và core | P0 xong (2026-10-18): đăng nhập, danh sách sự kiện |
+| 3a | **web-app** (repo `web-app`, ADR-015): SPA React + momi-ui; nginx trong image web-app làm gateway tạm (`/api/identity`, `/api/core`, chặn `/internal`); refresh token cookie ở identity; OpenAPI ở identity và core | Xong (2026-10-19): khách mua vé, chọn ghế, thanh toán MockPay (return-url về web), vé QR, chuyển nhượng; ban tổ chức tạo sự kiện, loại vé, ghế, nhân viên, công bố; soát vé; quản trị tài khoản |
 
 Sau bước 3, các mốc M4–M6 của lộ trình (dữ liệu lớn, flash sale, vận hành) làm trên core-service.
 
