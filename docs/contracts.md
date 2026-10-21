@@ -70,7 +70,7 @@ những service được phép (`ticket2h.internal-api.clients.<tên-service>`).
 | Service gọi | Biến chứa khoá | Được gọi tới |
 |---|---|---|
 | notification-service | `INTERNAL_API_KEY_NOTIFICATION` | core-service (`/internal/tickets`), identity-service (`/internal/users/{id}`) |
-| core-service | `INTERNAL_API_KEY_CORE` | identity-service (`/internal/users/lookup`, `/internal/users/{id}`) |
+| core-service | `INTERNAL_API_KEY_CORE` | identity-service (`/internal/users/lookup`, `/internal/users/batch`) |
 
 ## 3. API nội bộ của core-service
 
@@ -96,7 +96,7 @@ Test giữ hợp đồng: `InternalApiIT` ở core (khoá đúng/sai, JWT không
 
 ## 4. API nội bộ của identity-service
 
-Hai API trả cùng một dạng, `Cache-Control: no-store`:
+Mỗi tài khoản trả cùng một dạng (`/batch` trả một mảng các tài khoản như vậy), `Cache-Control: no-store`:
 
 ```json
 { "id": "uuid", "email": "buyer@test.local", "fullName": "Nguyễn Văn An",
@@ -108,10 +108,20 @@ Hai API trả cùng một dạng, `Cache-Control: no-store`:
 
 ### `GET /internal/users/{userId}`
 
-Gọi bởi: notification-service (email và tên người nhận), core-service (email và tên nhân viên soát vé trong
-`GET /organizer/events/{id}/staff`, mỗi người một lần gọi). Không có người dùng, hoặc id không phải UUID: `404`,
-`code = NOT_FOUND`. core coi `404` là tài khoản đã bị xoá (vẫn liệt kê id, `email` và `fullName` là `null`); mã lỗi
-khác hoặc không trả lời: core báo `502 IDENTITY_UNAVAILABLE`.
+Gọi bởi: notification-service (email và tên người nhận). Không có người dùng, hoặc id không phải UUID: `404`,
+`code = NOT_FOUND`. (Đến M4 core-service cũng gọi API này cho danh sách nhân viên soát vé, mỗi người một lần; nay core
+dùng `/batch` bên dưới.)
+
+### `POST /internal/users/batch` với body `{"ids": ["uuid", ...]}` (M4)
+
+Gọi bởi: core-service, mỗi lần tối đa 1.000 id: tên và email nhân viên soát vé (`GET /organizer/events/{id}/staff`),
+người mua trong danh sách đơn (`GET /organizer/events/{id}/orders`, một lần mỗi trang) và trong file danh sách khách
+(`attendees.csv`, một lần mỗi lô 1.000 vé: 500.000 khách là 500 lần gọi thay vì 500.000). Trả `200`
+`{"users": [ ...dạng trên... ]}`, không theo thứ tự nào; id không có tài khoản (đã xoá, sai) thì **không có trong kết
+quả**, không `404`, để một tài khoản đã xoá không làm hỏng cả lô. id trùng nhau coi như một. `ids` rỗng, thiếu, hoặc
+hơn 1.000 id: `400 VALIDATION_FAILED`. core coi id không có trong kết quả là tài khoản đã bị xoá (nhân viên vẫn liệt
+kê với `email`, `fullName` là `null`; người mua là "tài khoản không còn"); mã lỗi khác hoặc không trả lời: core báo
+`502 IDENTITY_UNAVAILABLE` (file danh sách khách thử lại một lần trước khi bỏ cuộc).
 
 ### `POST /internal/users/lookup` với body `{"email": "..."}`
 
@@ -161,6 +171,23 @@ identity lúc khởi động. Mật khẩu `Passw0rd!`.
 | `0b000000-0000-4000-8000-000000000004` … `…006` | `buyer1` … `buyer3@test.local` (CUSTOMER) |
 
 Đổi các id này phải sửa cả `DevAccounts` (identity) lẫn `DevDataSeeder` (core).
+
+### Dữ liệu sinh cho M4 (profile `datagen`, ADR-021)
+
+`scripts/datagen.sh` chạy công cụ sinh của identity-service rồi của core-service với cùng các con số `customers`,
+`organizers`, `staff`. Mỗi bên chỉ ghi database của mình; đơn của core trỏ đúng tài khoản identity đã sinh vì hai bên
+tính id theo cùng công thức (`DatagenIds` ở cả hai repo, `i` đếm từ 1, viết hex 12 chữ số):
+
+| Id | Là gì | Email (mật khẩu `Passw0rd!`) |
+|---|---|---|
+| `0e000000-0000-4000-8000-{i}` | Ban tổ chức thứ i | |
+| `0c000000-0000-4000-8000-{i}` | Tài khoản ORGANIZER của ban tổ chức thứ i | `btc{i}@datagen.ticket2h.local` |
+| `0f000000-0000-4000-8000-{i}` | Nhân viên soát vé thứ i | `soatve{i}@datagen.ticket2h.local` |
+| `0d000000-0000-4000-8000-{i}` | Khách thứ i | `khach{i}@datagen.ticket2h.local` |
+
+Ví dụ khách thứ 2.000.000: `0d000000-0000-4000-8000-0000001e8480`. Test giữ công thức: `DatagenIdsTest` ở identity và
+`CoreDataGeneratorIT.shared_ids_match_the_contract` ở core kiểm tra cùng các giá trị. Sự kiện lớn đang mở bán (200.000
+đơn) thuộc ban tổ chức mẫu Sky (`0a…01`) ở trên, để đăng nhập `organizer1@test.local` là xem được.
 
 ## 7. MockPay
 

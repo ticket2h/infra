@@ -11,3 +11,7 @@ thì viết ADR mới và đánh dấu ADR cũ là "Bị thay thế bởi ADR-NN
 | [013](013-tach-identity-service.md) | Tách identity-service; core tin JWT RS256 qua JWKS, không giữ bản sao người dùng |
 | [014](014-repo-tu-dung-ci-image.md) | Mỗi repo tự đứng được: CI riêng, image trên GHCR, infra chạy cả hệ thống từ image |
 | [015](015-web-gateway-refresh-token.md) | Web SPA, gateway nginx trong image web-app, refresh token cookie, OpenAPI |
+| [021](021-cong-cu-sinh-du-lieu-lon.md) | M4: công cụ sinh dữ liệu lớn, mỗi service sinh phần của mình, khớp nhau bằng id tất định |
+
+ADR-016…020 (M4: báo cáo doanh thu, xuất CSV lớn, phân trang keyset, partition `checkin_logs`, nhập ghế từ CSV) là
+thiết kế bên trong core-service, nằm ở [`core-service/docs/adr/`](https://github.com/ticket2h/core-service/tree/main/docs/adr).

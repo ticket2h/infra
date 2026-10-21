@@ -281,22 +281,43 @@ Danh sách API: [identity-service README](https://github.com/ticket2h/identity-s
 Mỗi repo chạy test riêng:
 
 ```bash
-cd ~/personal-projects/ticket2h/identity-service && ./mvnw verify       # 27 test
-cd ~/personal-projects/ticket2h/core-service && ./mvnw verify           # khoảng 170 test, 2–3 phút
+cd ~/personal-projects/ticket2h/identity-service && ./mvnw verify       # khoảng 50 test
+cd ~/personal-projects/ticket2h/core-service && ./mvnw verify           # khoảng 225 test, 4–6 phút
 cd ~/personal-projects/ticket2h/notification-service && ./mvnw verify   # 13 test
 cd ~/personal-projects/ticket2h/mock-payment-gateway && ./mvnw verify   # 48 test
 ```
 
 Test tự bật PostgreSQL và Kafka **riêng** bằng Testcontainers (cần Docker), không đụng tới dữ liệu ở Bước 4, và
-không cần service nào đang chạy. Service khác được thay bằng HTTP server giả: core dùng `FakeIdentity` (JWKS và tra
-email), notification dùng `FakeCoreApi` và `FakeIdentityApi`. Lần đầu lâu hơn vì phải tải image cho test.
+không cần service nào đang chạy. Service khác được thay bằng HTTP server giả: core dùng `FakeIdentity` (JWKS, tra
+email, tra theo lô), notification dùng `FakeCoreApi` và `FakeIdentityApi`. Lần đầu lâu hơn vì phải tải image cho test.
+Test M4 của core (báo cáo 200.000 đơn, xuất 500.000 dòng trong heap 256MB, nhập 50.000 ghế, trang thứ 10.000) tự
+sinh dữ liệu lớn ngay trong database của test, không cần Bước 8.
 
 Trên GitHub, mỗi repo chạy đúng các lệnh này ở mỗi lần push và pull request (tab **Actions**, file
 `.github/workflows/ci.yml`). Push lên `main` mà test xanh thì CI build image và đẩy lên `ghcr.io/ticket2h/<repo>`:
 đó là image Cách A ở Bước 5 tải về.
 
 Chạy một class test: `./mvnw test -Dtest=RequestHashTest` (unit test) hoặc
-`./mvnw verify -Dit.test=CheckinIT` (integration test, tên kết thúc bằng `IT`). Trong IntelliJ: bấm ▶ cạnh tên class test.
+`./mvnw verify -Dit.test=CheckinIT -DskipExportMemoryIT=true` (integration test, tên kết thúc bằng `IT`; cờ cuối bỏ qua
+test xuất 500.000 dòng của core, vốn luôn chạy trong một JVM riêng). Trong IntelliJ: bấm ▶ cạnh tên class test.
+
+## Bước 8 (tuỳ chọn). Dữ liệu lớn để thử M4
+
+Muốn thấy truy vấn nào chậm, báo cáo nào nhanh, trang thứ 10.000 ra sao, thì cần dữ liệu cỡ hệ thống đã chạy 2 năm.
+Trong `infra/`:
+
+```bash
+docker compose --profile apps pull            # image mới nhất có công cụ sinh dữ liệu
+scripts/datagen.sh                            # 2 triệu khách, 2.000 sự kiện, 10 triệu đơn, 30 triệu lượt quét
+# hoặc: scripts/datagen.sh --small            # 200.000 khách, 1 triệu đơn, 3 triệu lượt quét, vài phút
+docker compose --profile apps up -d           # bật lại hệ thống
+```
+
+Bản đầy đủ chạy khoảng 10–15 phút (máy 20 nhân, ổ NVMe) và làm database to thêm khoảng 25GB (`docker system df -v` để xem). Sau đó đăng
+nhập web (http://localhost:3000) bằng `organizer1@test.local` / `Passw0rd!`, mở "Đại nhạc hội Ticket2h 2026": sự kiện
+200.000 đơn đang mở bán, tab Doanh thu, Đơn hàng, nút Xuất file. Tài khoản sinh ra cũng đăng nhập được:
+`khach1@datagen.ticket2h.local` … `khach2000000@…`, `btc1@datagen.ticket2h.local`, `soatve1@datagen.ticket2h.local`,
+cùng mật khẩu. Xoá dữ liệu sinh: `docker compose down -v` (xoá cả dữ liệu khác của database).
 
 ---
 

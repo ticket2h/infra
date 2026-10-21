@@ -3,12 +3,13 @@
 [![CI](https://github.com/ticket2h/infra/actions/workflows/ci.yml/badge.svg)](https://github.com/ticket2h/infra/actions/workflows/ci.yml)
 
 Ticket2h là hệ thống bán vé sự kiện, đang được tách dần thành microservice. Hệ thống tiếp nối dự án TicketRush
-(M1–M3) trong `ticketrush-m2-m3-huong-dan.md`. Repo này không chứa code service. Nó chứa:
+(M1–M3 trong `ticketrush-m2-m3-huong-dan.md`; M4 "dữ liệu lớn" xong 2026-10-21). Repo này không chứa code service. Nó chứa:
 
 - `docker-compose.yml`: PostgreSQL, Kafka, Mailpit dùng chung khi chạy local; profile `apps` chạy thêm 4 service từ image
 - `postgres/init/`: tạo user và database riêng cho từng service
 - `scripts/init-env.sh`: sinh file `.env` chứa secret cho cả hệ thống
 - `scripts/demo.sh`: kịch bản mua vé chạy qua mọi service
+- `scripts/datagen.sh`: sinh dữ liệu lớn (2 triệu khách, 10 triệu đơn, 30 triệu lượt quét) để thử M4
 - `docs/`: kiến trúc, hợp đồng giữa các service, ADR cấp hệ thống
 
 ## Các repo
@@ -78,6 +79,7 @@ Mailpit, rồi check-in. Email xem ở http://localhost:8025.
 | Bật hạ tầng và 4 service | `docker compose --profile apps up -d` |
 | Cập nhật image service lên bản mới nhất trên `main` | `docker compose --profile apps pull` rồi `up -d` |
 | Log của một service | `docker compose logs -f core-service` |
+| Sinh dữ liệu lớn (M4) | `scripts/datagen.sh` (hoặc `--small`), xem [Bước 8](docs/chay-tren-may-moi.md#bước-8-tuỳ-chọn-dữ-liệu-lớn-để-thử-m4) |
 | Tắt, giữ dữ liệu | `docker compose --profile apps stop` |
 | Xoá sạch, kể cả database | `docker compose --profile apps down -v` |
 | Vào database của core | `docker compose exec postgres psql -U core` |

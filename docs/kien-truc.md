@@ -11,7 +11,7 @@
                  phát JWT (RS256)            payment, ticketing, outbox  ── X-Api-Key ──► mock-payment-gateway :9090
                    │  ▲   ▲   ▲                │      │                                   (không có database)
           database │  │   │   └── JWKS ────────┤      │ outbox → Kafka
-          "identity"   │   └── POST /internal/users/lookup, GET /internal/users/{id} (tra tài khoản)
+          "identity"   │   └── POST /internal/users/lookup, POST /internal/users/batch (tra tài khoản)
                    ▼  │                        ▼      ▼
               PostgreSQL     database "core"  PostgreSQL   ticket2h.ticket-events
                       │                                       │
@@ -25,7 +25,7 @@
 | Service | Làm gì | Dữ liệu riêng | Nói chuyện với ai |
 |---|---|---|---|
 | identity-service | Đăng ký, đăng nhập, phát JWT, quản trị tài khoản và ban tổ chức | database `identity` (`users`, `organizers`) | Công bố JWKS; cho core và notification gọi `/internal/users/**` |
-| core-service | Sự kiện, giữ ghế, đơn, thanh toán, phát vé, check-in, chuyển nhượng | database `core` | Kiểm tra JWT bằng JWKS; tra tài khoản ở identity (theo email, theo id); gọi MockPay; nhận webhook; gửi event lên Kafka; cho notification gọi `/internal/tickets` |
+| core-service | Sự kiện, giữ ghế, đơn, thanh toán, phát vé, check-in, chuyển nhượng; báo cáo doanh thu, danh sách đơn, file CSV cho ban tổ chức (M4) | database `core` | Kiểm tra JWT bằng JWKS; tra tài khoản ở identity (theo email, theo lô id); gọi MockPay; nhận webhook; gửi event lên Kafka; cho notification gọi `/internal/tickets` |
 | notification-service | Gửi email vé và email chuyển nhượng | database `notification` (sổ chống gửi trùng) | Nghe `ticket2h.ticket-events`; lấy email từ identity, vé từ core; gửi SMTP |
 | mock-payment-gateway | Giả lập cổng thanh toán, có chế độ "chaos" | không (lưu trong bộ nhớ) | Nhận lệnh từ core; gửi webhook về core |
 
@@ -85,7 +85,13 @@ service: [`contracts.md`](contracts.md).
 | 3 | **api-gateway** (Spring Cloud Gateway): client chỉ gọi một cổng; chặn `/internal/**` từ bên ngoài | Chưa làm, cần duyệt thêm dependency |
 | 3a | **web-app** (repo `web-app`, ADR-015): SPA React + momi-ui; nginx trong image web-app làm gateway tạm (`/api/identity`, `/api/core`, chặn `/internal`); refresh token cookie ở identity; OpenAPI ở identity và core | Xong (2026-10-19): khách mua vé, chọn ghế, thanh toán MockPay (return-url về web), vé QR, chuyển nhượng; ban tổ chức tạo sự kiện, loại vé, ghế, nhân viên, công bố; soát vé; quản trị tài khoản |
 
-Sau bước 3, các mốc M4–M6 của lộ trình (dữ liệu lớn, flash sale, vận hành) làm trên core-service.
+Các mốc M4–M6 của lộ trình (dữ liệu lớn, flash sale, vận hành) làm trên core-service (và identity khi cần).
+
+| Mốc | Việc | Trạng thái |
+|---|---|---|
+| M4 | Dữ liệu lớn: công cụ sinh dữ liệu (ADR-021), báo cáo doanh thu bằng bảng tổng hợp (ADR-016), file CSV lớn (ADR-017), phân trang keyset (ADR-018), partition `checkin_logs` (ADR-019), nhập ghế từ CSV (ADR-020); web có tab Doanh thu, Đơn hàng, nút Xuất file, Nhập ghế từ file | Xong (2026-10-21). Đo trên 10 triệu đơn: xem các ADR |
+| M5 | Flash sale, thời gian thực: phòng chờ, rate limit, cache, sơ đồ ghế cập nhật tức thời, 2 instance, k6 | Chưa làm, cần duyệt thêm Redis |
+| M6 | Vận hành: metrics, tracing, đối soát, mã hoá dữ liệu cá nhân, audit log | Chưa làm |
 
 Việc còn để ngỏ từ bước 2 (ADR-013): token sống 1 giờ và không thu hồi được (cần refresh token hoặc danh sách thu
 hồi), chưa có quy trình đổi khoá ký JWT (JWKS đã sẵn sàng cho việc này).
